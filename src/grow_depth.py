@@ -148,7 +148,7 @@ def expand_layers(model, layers_small, layers_large, expand_type='alternate'):
     `layers_small` number of layers to `layers_large` number of layers.
 
     Args:
-        model (trandsformers.AutoModelForCausalLM): The language model to expand
+        model (transformers.AutoModelForCausalLM): The language model to expand
         layers_small (int): The number of layers in the current model
         layers_large (int): The number of layers in the expanded model
         expand_type (str): The type of expansion to perform. Options are 'alternate' and 'append'
@@ -190,8 +190,6 @@ def expand_layers(model, layers_small, layers_large, expand_type='alternate'):
     # Change the number of layers stored in the config to layers_large
     model.config.num_hidden_layers = layers_large
     
-    print(model.gpt_neox.layers)
-
     # Use the saved state dict to preserve the functionality of the original model
     # Load the new_state_dict
     model.load_state_dict(new_state_dict)
