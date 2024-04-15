@@ -219,7 +219,7 @@ def wide_param(key, weight, old_width, new_width):
 
 
 
-def expand_width(model, old_width, new_width):
+def expand_width(model, old_width, new_width, attn_heads=None):
     """
     Expand the width of a model in a function preserving model from size `old_width` to 
     `new_width`. 
@@ -242,8 +242,10 @@ def expand_width(model, old_width, new_width):
     old_config = model.config
     new_config_dict = old_config.to_dict()
 
+   
     # Calculate new number of attention heads as new_width / (old_width/old_n_heads)
     new_n_heads = int(new_width / (old_width / old_config.num_attention_heads))
+
 
     new_config_dict["hidden_size"] = new_width
     new_config_dict["intermediate_size"] = new_width * 4
@@ -258,6 +260,8 @@ def expand_width(model, old_width, new_width):
     new_state_dict = wide_state_dict(old_state_dict, old_width, new_width)
 
     # Set config hidden size
+    if attn_heads is not None:
+        model.config.num_attention_heads = attn_heads
 
     # Load new state dict
     model.load_state_dict(new_state_dict)
