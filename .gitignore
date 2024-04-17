@@ -5,3 +5,7 @@ venv/
 .vscode/
 
 __pycache__/
+
+models/
+
+.DS_Store
