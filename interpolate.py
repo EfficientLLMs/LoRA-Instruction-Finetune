@@ -8,14 +8,14 @@ from tqdm import tqdm
 
 from grow import grow_depth, grow_width
 
-def plot_losses(losses):
+def plot_losses(alphas, losses, save_path="interpolation_loss.png"):
     plt.figure(figsize=(10, 5))
-    plt.plot(losses, marker='o', linestyle='-', color='b')
+    plt.plot(alphas, losses, marker='o', linestyle='-', color='b')
     plt.title('Model Evaluation Loss During Interpolation')
-    plt.xlabel('Interpolation Steps')
+    plt.xlabel('Interpolation Alpha (fraction of grown model)')
     plt.ylabel('Loss')
     plt.grid(True)
-    plt.show()
+    plt.savefig(save_path)
 
 def load_model(path, model_name):
     print(f"Loading model...")
@@ -46,7 +46,7 @@ def interpolate(model_1: AutoModelForCausalLM, model_2: AutoModelForCausalLM, al
     state_dict_1 = model_1.state_dict()
     state_dict_2 = model_2.state_dict()
 
-    # Interpolate between the weights
+    # Interpolate between the weights - only change nn.Linear weights
     new_state_dict = {}
     for key in state_dict_1:
         new_state_dict[key] = alpha * state_dict_1[key] + (1 - alpha) * state_dict_2[key]
@@ -80,13 +80,15 @@ def interpolate_models_generation(model_1: PeftModel, model_2: PeftModel, n_inte
 
 def interpolate_models_loss(model_1, model_2, n_interpolations, dataloader, device, tokenizer):
     losses = []
+    alphas = []
     for i in range(n_interpolations):
         alpha = i / (n_interpolations - 1)
+        alphas.append(alpha)
         print('-'*50)
         print(f"Interpolating with alpha={alpha}")
         model_interpolated = interpolate(model_1, model_2, alpha)
         loss_tracking_callback(model_interpolated, dataloader, device, tokenizer, losses)
-    return losses
+    return losses, alphas
 
 def generate_example_callback(model: AutoModelForCausalLM, tokenizer: AutoTokenizer, prompt: str):
     
@@ -145,6 +147,16 @@ def loss_tracking_callback(model, dataloader, device, tokenizer, losses):
 
 if __name__ == "__main__":
 
+    # Add command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output_small", type=str, default="./output/70m_no_trainer/")
+    parser.add_argument("--output_large", type=str, default="./output/410m_no_trainer/")
+    parser.add_argument('--base_model_small', type=str, default="EleutherAI/pythia-70m")
+    parser.add_argument('--base_model_large', type=str, default="EleutherAI/pythia-410m")
+    parser.add_argument('--n_interpolations', type=int, default=5)
+
+    args = parser.parse_args()
+
     # Get fine-tuned 70m model
     model_70m = "EleutherAI/pythia-70m"
     # path_lora_70m = "models/70m_no_trainer"
@@ -159,6 +171,8 @@ if __name__ == "__main__":
     model_410m_ft = load_model(path_lora_410m, model_410m)
 
     # Grow 70m model to 410m
+
+    # TODO: remove hard-coding here
 
     # Depth from 6 -> 24
     intermediate_grown = grow_depth.expand_layers(model_70m_ft, 6, 12, expand_type='alternate')
@@ -185,6 +199,6 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     eval_dataloader = torch.load("data/eval_dataloader.pt")
-    losses = interpolate_models_loss(model_70m_ft_grown_410m, model_410m_ft, 5, eval_dataloader, device, tokenizer)
-    plot_losses(losses)
+    losses, alphas = interpolate_models_loss(model_70m_ft_grown_410m, model_410m_ft, 5, eval_dataloader, device, tokenizer)
+    plot_losses(alphas, losses, save_path='interpolation_loss_fine_tuned.png')
     
