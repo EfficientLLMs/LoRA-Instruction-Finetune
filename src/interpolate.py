@@ -11,27 +11,6 @@ import eval_utils
 from grow import grow_depth, grow_width
 
 
-def load_model(path: str, model_name: str):
-    """
-    Load a model from a path and model name
-
-    Args:
-        path: Path to the model
-        model_name: Name of the model
-    """
-
-    print(f"Loading model...")
-
-    base_model = GPTNeoXForCausalLM.from_pretrained(
-        model_name,
-        low_cpu_mem_usage=True,
-        return_dict=True,
-        # torch_dtype=torch.float16,
-        # device_map=0,
-    )
-    model = PeftModel.from_pretrained(base_model, path)
-    model = model.merge_and_unload()
-    return model
 
 
 class Interpolate:
@@ -159,32 +138,36 @@ class Interpolate:
 
 
     @staticmethod
-    def _loss_tracking_callback(model, dataloader, device, tokenizer, losses):
+    def _loss_tracking_callback(model, dataloader, device, tokenizer, losses, rouges):
         model.to(device)
-        loss = eval_utils.evaluate_model(model, dataloader, device, tokenizer)
+        loss, rouge = eval_utils.evaluate_model(model, dataloader, device, tokenizer)
+
         losses.append(loss)
+        rouges.append(rouge)
 
     @staticmethod
-    def interpolate_models_by_weights_loss(
+    def interpolate_models_by_weights_loss_rouge(
         model_1: PeftModel, 
         model_2: PeftModel, 
         n_interpolations: int,
         dataloader: torch.utils.data.DataLoader, 
         device: torch.device, 
         tokenizer: AutoTokenizer,
-    ):
+    ) -> List[List[float]]:
         losses = []
         alphas = []
+        rouges = []
         for i in range(n_interpolations):
             alpha = i / (n_interpolations - 1)
             alphas.append(alpha)
             print('-'*50)
             print(f"Interpolating with alpha={alpha}")
             model_interpolated = Interpolate._interpolate_weights_model(model_1, model_2, alpha)
-            Interpolate._loss_tracking_callback(model_interpolated, dataloader, device, tokenizer, losses)
-        return losses, alphas
-
+            Interpolate._loss_tracking_callback(model_interpolated, dataloader, device, tokenizer, losses, rouges)
+        return losses, alphas, rouges
     
+
+
     @staticmethod
     def interpolate_models_by_logits_loss(
         model_1: PeftModel, 
@@ -203,19 +186,14 @@ class Interpolate:
             print('-'*50)
             print(f"Interpolating with alpha={alpha}")
 
-            
-
-            
-
-            
         return losses, alphas
 
 if __name__ == "__main__":
 
     # Add command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output_small", type=str, default="./output/70m_no_trainer/")
-    parser.add_argument("--output_large", type=str, default="./output/410m_no_trainer/")
+    parser.add_argument("--output_small", type=str, default="./output/70m/no_trainer/")
+    parser.add_argument("--output_large", type=str, default="./output/410m/no_trainer/")
     parser.add_argument('--base_model_small', type=str, default="EleutherAI/pythia-70m")
     parser.add_argument('--base_model_large', type=str, default="EleutherAI/pythia-410m")
     parser.add_argument('--n_interpolations', type=int, default=5)
@@ -226,14 +204,14 @@ if __name__ == "__main__":
     model_70m = "EleutherAI/pythia-70m"
     # path_lora_70m = "models/70m_no_trainer"
     path_lora_70m = "output/70m/no_trainer"
-    model_70m_ft = load_model(path_lora_70m, model_70m)
+    model_70m_ft = eval_utils.load_model(model_70m, path_lora_70m)
     
 
     # Get fine-tuned 410m model
     model_410m = "EleutherAI/pythia-410m"
     # path_lora_410m = "models/410m_no_trainer"
     path_lora_410m = "output/410m/no_trainer"
-    model_410m_ft = load_model(path_lora_410m, model_410m)
+    model_410m_ft = eval_utils.load_model(model_410m, path_lora_410m)
 
     # Get the tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_70m)
