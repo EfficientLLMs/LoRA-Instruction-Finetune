@@ -7,5 +7,6 @@ venv/
 __pycache__/
 
 models/
+output/
 
 .DS_Store
