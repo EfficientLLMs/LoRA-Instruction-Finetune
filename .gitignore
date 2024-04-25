@@ -10,3 +10,5 @@ models/
 output/
 
 .DS_Store
+
+.slurm_logs/

@@ -6,3 +6,4 @@ pip install transformers
 pip install ipdb
 pip install peft
 pip install datasets
+pip install absl-py nltk rouge-score

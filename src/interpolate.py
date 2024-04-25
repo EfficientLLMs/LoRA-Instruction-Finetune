@@ -140,7 +140,7 @@ class Interpolate:
     @staticmethod
     def _loss_tracking_callback(model, dataloader, device, tokenizer, losses, rouges):
         model.to(device)
-        loss, rouge = eval_utils.evaluate_model(model, dataloader, device, tokenizer)
+        loss, rouge = eval_utils.evaluate_model_loss_rouge(model, dataloader, device, tokenizer)
 
         losses.append(loss)
         rouges.append(rouge)
