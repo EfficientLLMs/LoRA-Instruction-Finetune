@@ -78,12 +78,28 @@ if __name__ == "__main__":
         torch.device("cuda"),
         tokenizer
     )
+    
+    rouges = [r['rougeL_high_recall'] for r in rouges]
 
     # Plot the losses
-    eval_utils.plot_losses(alphas, losses, save_path="interpolation_loss_lpt_slpt.png")
+    eval_utils.plot_losses(
+        alphas, 
+        losses, 
+        save_path="interpolation_loss_lpt_slpt.png",
+        title="Model Evaluation Loss During Interpolation (Large Pretrained Model to Shifted Large Pretrained Model)",
+        xlabel="Interpolation Alpha (fraction of large pretrained model)",
+        ylabel="Loss"
+    )
 
     # Plot the rouge scores
-    eval_utils.plot_losses(alphas, losses, save_path="interpolation_rouge_lpt_slpt.png")
+    eval_utils.plot_losses(
+        alphas, 
+        rouges, 
+        save_path="interpolation_rouge_lpt_slpt.png",
+        title="Model Evaluation Rouge Scores During Interpolation (Large Pretrained Model to Shifted Large Pretrained Model)",
+        xlabel="Interpolation Alpha (fraction of large pretrained model)",
+        ylabel="Rouge Score"
+    )
 
 
     # 2. Interpolate shifted_large_pretrained_model and large_finetuned_model
@@ -96,8 +112,24 @@ if __name__ == "__main__":
         tokenizer
     )
 
+    rouges = [r['rougeL_high_recall'] for r in rouges]
+
     # Plot the losses
-    eval_utils.plot_losses(alphas, losses, save_path="interpolation_loss_slpt_lft.png")
+    eval_utils.plot_losses(
+        alphas, 
+        losses, 
+        save_path="interpolation_loss_slpt_lft.png", 
+        title="Model Evaluation Loss During Interpolation (Shifted Large Pretrained Model to Large Finetuned Model)",
+        xlabel="Interpolation Alpha (fraction of shifted large pretrained model)",
+        ylabel="Loss"
+    )
 
     # Plot the rouge scores
-    eval_utils.plot_losses(alphas, losses, save_path="interpolation_rouge_slpt_lft.png")
+    eval_utils.plot_losses(
+        alphas, 
+        rouges, 
+        save_path="interpolation_rouge_slpt_lft.png",
+        title="Model Evaluation Rouge Scores During Interpolation (Shifted Large Pretrained Model to Large Finetuned Model)",
+        xlabel="Interpolation Alpha (fraction of shifted large pretrained model)",
+        ylabel="RougeL high Recall Score"
+    )

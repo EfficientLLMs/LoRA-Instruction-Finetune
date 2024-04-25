@@ -105,12 +105,17 @@ def load_model(model_name: str, path: str = None):
     return model
     
 
-def plot_losses(alphas, losses, save_path="interpolation_loss.png"):
+def plot_losses(alphas, losses, save_path="interpolation_loss.png", **kwargs):
+
+    title = kwargs.get('title', 'Model Evaluation Loss During Interpolation')
+    xlabel = kwargs.get('xlabel', 'Interpolation Alpha (fraction of grown model)')
+    ylabel = kwargs.get('ylabel', 'Loss')
+
     plt.figure(figsize=(10, 5))
     plt.plot(alphas, losses, marker='o', linestyle='-', color='b')
-    plt.title('Model Evaluation Loss During Interpolation')
-    plt.xlabel('Interpolation Alpha (fraction of grown model)')
-    plt.ylabel('Loss')
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     plt.grid(True)
     plt.savefig(save_path)
 
