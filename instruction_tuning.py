@@ -120,6 +120,8 @@ if __name__ == "__main__":
     #     device_map=args.device,
     # )
     # model = get_peft_model(model, config_mora)
+    # for name, param in model.named_parameters():
+    #     print(name, param.requires_grad)
 
     # larger base model + expanded adapter
     base_model = GPTNeoXForCausalLM.from_pretrained(
@@ -128,9 +130,11 @@ if __name__ == "__main__":
     )
     large_adapter = "weight/pythia_70m_mora_expanded_padding_r=64"
     model = PeftModel.from_pretrained(base_model, large_adapter)
-    # continue training
-    for param in model.parameters():
-        param.requires_grad = True
+
+    for name, param in model.named_parameters():
+        if "lora" in name:
+            param.requires_grad = True
+        print(name, param.requires_grad)
 
     # training and save
     train_model(model, train_dataloader, eval_dataloader, args.epochs, args.lr, args.device, tokenizer, args.output)
