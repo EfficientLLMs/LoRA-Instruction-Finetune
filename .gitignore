@@ -12,3 +12,6 @@ output/
 .DS_Store
 
 .slurm_logs/
+
+weight/
+pythia-70m/
