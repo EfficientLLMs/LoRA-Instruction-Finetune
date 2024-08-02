@@ -13,5 +13,7 @@ output/
 
 .slurm_logs/
 
+weight
 weight/
 pythia-70m/
+wandb/

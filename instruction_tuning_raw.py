@@ -44,6 +44,7 @@ def evaluate_model(model, test_dl, device, tokenizer):
 
 def train_model(model, train_dl, test_dl, epochs, lr, device, tokenizer, output):
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs, eta_min=1e-6)
     model.train()
     print("Start training...")
 
@@ -61,12 +62,19 @@ def train_model(model, train_dl, test_dl, epochs, lr, device, tokenizer, output)
 
             total_loss += loss.item()
 
+        scheduler.step()
+
         avg_train_loss = total_loss / len(train_dl)
         print(f"Epoch {epoch} - Average Training Loss: {avg_train_loss}")
-        wandb.log({"epoch": epoch, "training_loss": avg_train_loss})
 
         eval_loss, eval_rouge_scores = evaluate_model(model, test_dl, device, tokenizer)
-        wandb.log({"epoch": epoch, "evaluation_loss": eval_loss, **eval_rouge_scores})
+        wandb.log({
+            "epoch": epoch, 
+            "learning_rate": scheduler.get_last_lr()[0],
+            "training_loss": avg_train_loss,
+            "evaluation_loss": eval_loss, 
+            **eval_rouge_scores
+        })
 
         model.save_pretrained(output)
     print("Training finished...")
@@ -79,7 +87,7 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--epochs", type=int, default=8)
     parser.add_argument("--lr", type=float, default=1e-4)
-    parser.add_argument("--output", type=str, default="./weight/pythia_410m_mora_expanded_padding_r=64/")
+    parser.add_argument("--output", type=str, default="./weight/pythia_410m_r=64/")
     args = parser.parse_args()
 
     # seed
@@ -90,7 +98,11 @@ if __name__ == "__main__":
     eval_dataloader = torch.load("./data/eval_dataloader.pt")
 
     # wandb
-    wandb.init(project="mora-instruction-finetune", entity="irisiris")
+    wandb.init(
+        name="410m_r=64_1e-4_schedule",
+        project="lora-instruction-finetune", 
+        entity="vibhamasti"
+    )
     wandb.config = {
         "learning_rate": args.lr,
         "epochs": args.epochs,
@@ -105,31 +117,19 @@ if __name__ == "__main__":
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
 
-    # # mora and model
-    # config_mora = LoraConfig(
-    #     use_mora=True, 
-    #     mora_type=6,  # RoPE for small rank
-    #     r=64, 
-    #     target_modules=["query_key_value"], 
-    #     lora_dropout=0.05, 
-    #     task_type="CAUSAL_LM"
-    #     # MoRA does not use lora_alpha
-    # )
-    # model = GPTNeoXForCausalLM.from_pretrained(
-    #     "EleutherAI/pythia-410m",
-    #     device_map=args.device,
-    # )
-    # model = get_peft_model(model, config_mora)
-    # for name, param in model.named_parameters():
-    #     print(name, param.requires_grad)
-
+    
     # larger base model + expanded adapter
     base_model = GPTNeoXForCausalLM.from_pretrained(
         "EleutherAI/pythia-410m",
         device_map=args.device,
     )
-    large_adapter = "weight/pythia_70m_mora_expanded_padding_r=64"
-    model = PeftModel.from_pretrained(base_model, large_adapter)
+    config_lora = LoraConfig(
+        r=64, 
+        target_modules=["query_key_value"],
+        lora_dropout=0.05,
+        task_type="CAUSAL_LM"
+    )
+    model = get_peft_model(base_model, config_lora)
 
     for name, param in model.named_parameters():
         if "lora" in name:
