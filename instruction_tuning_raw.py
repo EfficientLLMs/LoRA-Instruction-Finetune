@@ -87,6 +87,8 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--epochs", type=int, default=8)
     parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--wandb_name", type=str, default="410m_r=64_1e-4_schedule")
+    parser.add_argument("--base_model", type=str, default="EleutherAI/pythia-410m")
     parser.add_argument("--output", type=str, default="./weight/pythia_410m_r=64/")
     args = parser.parse_args()
 
@@ -99,7 +101,7 @@ if __name__ == "__main__":
 
     # wandb
     wandb.init(
-        name="410m_r=64_1e-4_schedule",
+        name=args.wandb_name,
         project="lora-instruction-finetune", 
         entity="vibhamasti"
     )
@@ -112,7 +114,7 @@ if __name__ == "__main__":
 
     # tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
-        "EleutherAI/pythia-410m",  # standard model; the same tokenizer is used for all models
+        args.base_model,  # standard model; the same tokenizer is used for all models
     )
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
@@ -120,21 +122,25 @@ if __name__ == "__main__":
     
     # larger base model + expanded adapter
     base_model = GPTNeoXForCausalLM.from_pretrained(
-        "EleutherAI/pythia-410m",
+        args.base_model,
         device_map=args.device,
     )
     config_lora = LoraConfig(
         r=64, 
-        target_modules=["query_key_value"],
+        lora_alpha=32,
         lora_dropout=0.05,
+        target_modules=["query_key_value"],
+        bias="none",
         task_type="CAUSAL_LM"
     )
     model = get_peft_model(base_model, config_lora)
 
-    for name, param in model.named_parameters():
-        if "lora" in name:
-            param.requires_grad = True
-        print(name, param.requires_grad)
+    model.print_trainable_parameters()
+
+    # for name, param in model.named_parameters():
+    #     if "lora" in name:
+    #         param.requires_grad = True
+    #     print(name, param.requires_grad)
 
     # training and save
     train_model(model, train_dataloader, eval_dataloader, args.epochs, args.lr, args.device, tokenizer, args.output)

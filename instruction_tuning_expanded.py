@@ -42,9 +42,11 @@ def evaluate_model(model, test_dl, device, tokenizer):
 
     return avg_eval_loss, final_rouge_scores
 
-def train_model(model, train_dl, test_dl, epochs, lr, device, tokenizer, output):
+def train_model(model, train_dl, test_dl, epochs, lr, device, tokenizer, output, use_scheduler):
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs, eta_min=1e-6)
+
+    if use_scheduler:
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs, eta_min=1e-6)
     model.train()
     print("Start training...")
 
@@ -62,16 +64,19 @@ def train_model(model, train_dl, test_dl, epochs, lr, device, tokenizer, output)
 
             total_loss += loss.item()
 
-        scheduler.step()
+        if use_scheduler:
+            scheduler.step()
 
         avg_train_loss = total_loss / len(train_dl)
         print(f"Epoch {epoch} - Average Training Loss: {avg_train_loss}")
 
         eval_loss, eval_rouge_scores = evaluate_model(model, test_dl, device, tokenizer)
 
+        lr = scheduler.get_last_lr()[0] if use_scheduler else lr
+
         wandb.log({
             "epoch": epoch, 
-            "learning_rate": scheduler.get_last_lr()[0],
+            "learning_rate": lr,
             "training_loss": avg_train_loss,
             "evaluation_loss": eval_loss, 
             **eval_rouge_scores
@@ -91,6 +96,7 @@ if __name__ == "__main__":
     parser.add_argument("--base_model", type=str, default="EleutherAI/pythia-410m")
     parser.add_argument("--large_adapter", type=str, default="./weight/pythia_70m_lora_expanded_padding_r=64")
     parser.add_argument("--output", type=str, default="./weight/pythia_410m_lora_expanded_padding_r=64/")
+    parser.add_argument("--scheduler", action="store_true")
     args = parser.parse_args()
 
     # seed
@@ -103,7 +109,7 @@ if __name__ == "__main__":
     # wandb
     wandb.init(
         # name="410m_r=64",
-        name="70m_410m_lora_expanded_padding_r=64_1e-5",
+        name="70m_410m_lora_noop_expanded_padding_r=64_1e-4_schedule",
         project="lora-instruction-finetune", 
         entity="vibhamasti"
     )
@@ -127,8 +133,10 @@ if __name__ == "__main__":
         device_map=args.device,
     )
 
+    print("Base model loaded...")
     model = PeftModel.from_pretrained(base_model, args.large_adapter)
 
+    print("LoRA model loaded...")
     # unfreeze lora weights
     for name, param in model.named_parameters():
         if "lora" in name:
@@ -136,5 +144,5 @@ if __name__ == "__main__":
         print(name, param.requires_grad)
 
     # training and save
-    train_model(model, train_dataloader, eval_dataloader, args.epochs, args.lr, args.device, tokenizer, args.output)
+    train_model(model, train_dataloader, eval_dataloader, args.epochs, args.lr, args.device, tokenizer, args.output, args.scheduler)
     wandb.finish()
