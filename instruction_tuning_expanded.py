@@ -49,7 +49,7 @@ def evaluate_model(model, test_dl, accelerator, tokenizer):
 
     return avg_eval_loss, final_rouge_scores
 
-def train_model(model, optimizer, scheduler, train_dl, test_dl, epochs, accelerator, tokenizer, output):
+def train_model(model, optimizer, scheduler, lr, train_dl, test_dl, epochs, accelerator, tokenizer, output):
     model.train()
     if accelerator.is_main_process:
         print("Start training...")
@@ -71,7 +71,12 @@ def train_model(model, optimizer, scheduler, train_dl, test_dl, epochs, accelera
 
             total_loss += loss.item()
 
-        scheduler.step()
+        if scheduler is not None:
+            scheduler.step()
+            learning_rate = scheduler.get_last_lr()[0]
+        
+        else:
+            learning_rate = lr
 
         avg_train_loss = total_loss / len(train_dl)
         if accelerator.is_main_process:
@@ -81,7 +86,7 @@ def train_model(model, optimizer, scheduler, train_dl, test_dl, epochs, accelera
         if accelerator.is_main_process:
             wandb.log({
                 "epoch": epoch, 
-                "learning_rate": scheduler.get_last_lr()[0],
+                "learning_rate": learning_rate,
                 "training_loss": avg_train_loss,
                 "evaluation_loss": eval_loss, 
                 **eval_rouge_scores
@@ -106,12 +111,21 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=1006)
     parser.add_argument("--epochs", type=int, default=8)
     parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--scheduler", action="store_true")
     args = parser.parse_args()
 
-    args.wandb_name = f"{args.small_model}_{args.large_model}_{args.expand_method}_r=64_{args.lr}_schedule"
     args.base_model = f"EleutherAI/pythia-{args.large_model}"  # large model
-    args.output = f"./weight/pythia_{args.small_model}_{args.large_model}_{args.expand_method}_r=64_{args.lr}_schedule/"
-    args.large_adapter = f"./weight/pythia_{args.small_model}_{args.large_model}_{args.expand_method}_r=64"
+
+    if args.scheduler:
+        args.wandb_name = f"{args.small_model}_{args.large_model}_{args.expand_method}_r=64_{args.lr}_schedule"  
+        args.output = f"./weight/pythia_{args.small_model}_{args.large_model}_{args.expand_method}_r=64_{args.lr}_schedule/"
+        args.large_adapter = f"./weight/pythia_{args.small_model}_{args.large_model}_{args.expand_method}_r=64_schedule/"
+    
+    else:
+        args.wandb_name = f"{args.small_model}_{args.large_model}_{args.expand_method}_r=64_{args.lr}"  
+        args.output = f"./weight/pythia_{args.small_model}_{args.large_model}_{args.expand_method}_r=64_{args.lr}_fixed/"
+        args.large_adapter = f"./weight/pythia_{args.small_model}_{args.large_model}_{args.expand_method}_r=64_fixed/"
+
 
     # accelerator
     accelerator = Accelerator()
@@ -130,7 +144,7 @@ if __name__ == "__main__":
         wandb.init(
             name=args.wandb_name,
             project="lora-instruction-finetune", 
-            entity="irisiris"
+            entity="vibhamasti"
         )
         wandb.config = {
             "learning_rate": args.lr,
@@ -165,13 +179,22 @@ if __name__ == "__main__":
 
     # optimizer and scheduler
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1e-6)
 
-    # prepare for accelerator
-    model, optimizer, scheduler, train_dataloader, eval_dataloader = accelerator.prepare(
-        model, optimizer, scheduler, train_dataloader, eval_dataloader
-    )
+    if args.scheduler:
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1e-6)
+
+        # prepare for accelerator
+        model, optimizer, scheduler, train_dataloader, eval_dataloader = accelerator.prepare(
+            model, optimizer, scheduler, train_dataloader, eval_dataloader
+        )
+    else:
+        scheduler = None
+
+        # prepare for accelerator
+        model, optimizer, train_dataloader, eval_dataloader = accelerator.prepare(
+            model, optimizer, train_dataloader, eval_dataloader
+        )
 
     # training and save
-    train_model(model, optimizer, scheduler, train_dataloader, eval_dataloader, args.epochs, accelerator, tokenizer, args.output)
+    train_model(model, optimizer, scheduler, args.lr, train_dataloader, eval_dataloader, args.epochs, accelerator, tokenizer, args.output)
     wandb.finish()
