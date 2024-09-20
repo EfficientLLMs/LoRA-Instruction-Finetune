@@ -112,15 +112,12 @@ if __name__ == "__main__":
 
     if args.scheduler:
         args.wandb_name = f"{args.name}_r=64_{args.lr}_schedule"
-    else:
-        args.wandb_name = f"{args.name}_r=64_{args.lr}_no_schedule"
-        
-    args.base_model = f"EleutherAI/pythia-{args.name}"
-
-    if args.scheduler:
         args.output = f"./weight/pythia_{args.name}_r=64_{args.lr}_schedule/"
     else:
+        args.wandb_name = f"{args.name}_r=64_{args.lr}_fixed"
         args.output = f"./weight/pythia_{args.name}_r=64_{args.lr}_fixed/"
+        
+    args.base_model = f"EleutherAI/pythia-{args.name}"
 
 
     # accelerator
@@ -164,7 +161,7 @@ if __name__ == "__main__":
         use_cache=False,
     )
     config_lora = LoraConfig(
-        r=64, 
+        r=8, 
         lora_alpha=32,
         lora_dropout=0.05,
         target_modules=["query_key_value"],

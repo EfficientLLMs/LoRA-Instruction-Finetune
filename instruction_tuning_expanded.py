@@ -105,9 +105,9 @@ def train_model(model, optimizer, scheduler, lr, train_dl, test_dl, epochs, acce
 if __name__ == "__main__":
     # args
     parser = argparse.ArgumentParser()
-    parser.add_argument("--small_model", type=str, default='1.4b')
-    parser.add_argument("--large_model", type=str, default='2.8b')
-    parser.add_argument("--expand_method", type=str, default='copy')  # copy or padding
+    parser.add_argument("--small_model", type=str, default='410m')
+    parser.add_argument("--large_model", type=str, default='1.4b')
+    parser.add_argument("--expand_method", type=str, default='padding')  # copy or padding
     parser.add_argument("--seed", type=int, default=1006)
     parser.add_argument("--epochs", type=int, default=8)
     parser.add_argument("--lr", type=float, default=1e-4)
@@ -122,9 +122,9 @@ if __name__ == "__main__":
         args.large_adapter = f"./weight/pythia_{args.small_model}_{args.large_model}_{args.expand_method}_r=64_schedule/"
     
     else:
-        args.wandb_name = f"{args.small_model}_{args.large_model}_{args.expand_method}_r=64_{args.lr}"  
-        args.output = f"./weight/pythia_{args.small_model}_{args.large_model}_{args.expand_method}_r=64_{args.lr}_fixed/"
-        args.large_adapter = f"./weight/pythia_{args.small_model}_{args.large_model}_{args.expand_method}_r=64_fixed/"
+        args.wandb_name = f"{args.small_model}_{args.large_model}_{args.expand_method}_r=8_{args.lr}"  
+        args.output = f"./weight/pythia_{args.small_model}_{args.large_model}_{args.expand_method}_r=8_{args.lr}_fixed/"
+        args.large_adapter = f"./weight/pythia_expanded_{args.small_model}_{args.large_model}_{args.expand_method}_r=8/"
 
 
     # accelerator
